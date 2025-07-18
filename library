@@ -1,0 +1,333 @@
+-- UILibrary Module
+-- Refactored for modular, clean API usage (like Kavo/Rayfield)
+
+local UILibrary = {}
+
+-- Internal storage for windows, tabs, sections, etc.
+local windows = {}
+local themes = {
+    ["DarkTheme"] = {
+        Background = Color3.fromRGB(7, 7, 7),
+        Header = Color3.fromRGB(255, 80, 80),
+        TextColor = Color3.fromRGB(255,255,255),
+        ElementColor = Color3.fromRGB(20, 20, 20)
+    },
+    ["LightTheme"] = {
+        Background = Color3.fromRGB(255,255,255),
+        Header = Color3.fromRGB(255, 80, 80),
+        TextColor = Color3.fromRGB(0,0,0),
+        ElementColor = Color3.fromRGB(230,230,230)
+    },
+    -- Add more themes as needed
+}
+
+-- Helper: Create UI elements
+local function createInstance(class, props)
+    local inst = Instance.new(class)
+    for k,v in pairs(props) do
+        inst[k] = v
+    end
+    return inst
+end
+
+-- Window API
+function UILibrary.CreateWindow(title, themeNameOrTable)
+    local theme = themes[themeNameOrTable] or themeNameOrTable or themes["DarkTheme"]
+    local window = {}
+    window._tabs = {}
+    window._theme = theme
+    window._title = title
+
+    -- Create main ScreenGui and Frame
+    local gui = createInstance("ScreenGui", {
+        Name = "UILibraryGUI",
+        Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"),
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    })
+    local mainFrame = createInstance("Frame", {
+        Name = "MainFrame",
+        Parent = gui,
+        BackgroundColor3 = theme.Background,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0.3,0,0.2,0),
+        Size = UDim2.new(0.4,0,0.5,0)
+    })
+    createInstance("UICorner", {Parent = mainFrame, CornerRadius = UDim.new(0, 14)})
+    local header = createInstance("TextLabel", {
+        Name = "Header",
+        Parent = mainFrame,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0.05,0,0.02,0),
+        Size = UDim2.new(0.9,0,0.08,0),
+        Font = Enum.Font.FredokaOne,
+        Text = title,
+        TextColor3 = theme.Header,
+        TextScaled = true
+    })
+    -- Tabs container
+    local tabContainer = createInstance("Frame", {
+        Name = "TabContainer",
+        Parent = mainFrame,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0,0,0.1,0),
+        Size = UDim2.new(1,0,0.9,0)
+    })
+    window._gui = gui
+    window._mainFrame = mainFrame
+    window._tabContainer = tabContainer
+
+    function window:CreateTab(tabName)
+        local tab = {}
+        tab._sections = {}
+        tab._tabFrame = createInstance("Frame", {
+            Name = tabName .. "Tab",
+            Parent = tabContainer,
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1,0,1,0),
+            Visible = #window._tabs == 0 -- Only first tab visible by default
+        })
+        local tabButton = createInstance("TextButton", {
+            Name = tabName .. "Button",
+            Parent = mainFrame,
+            BackgroundColor3 = theme.ElementColor,
+            Position = UDim2.new(0.01 + (#window._tabs)*0.13, 0, 0.01, 0),
+            Size = UDim2.new(0.12,0,0.07,0),
+            Text = tabName,
+            Font = Enum.Font.FredokaOne,
+            TextColor3 = theme.TextColor,
+            TextScaled = true
+        })
+        tabButton.MouseButton1Click:Connect(function()
+            for _,t in ipairs(window._tabs) do
+                t._tabFrame.Visible = false
+            end
+            tab._tabFrame.Visible = true
+        end)
+        function tab:CreateSection(sectionName)
+            local section = {}
+            section._elements = {}
+            section._sectionFrame = createInstance("Frame", {
+                Name = sectionName .. "Section",
+                Parent = tab._tabFrame,
+                BackgroundColor3 = theme.ElementColor,
+                Size = UDim2.new(0.95,0,0.25,0),
+                Position = UDim2.new(0.025,0,0.05 + #tab._sections*0.27,0)
+            })
+            createInstance("UICorner", {Parent = section._sectionFrame, CornerRadius = UDim.new(0, 8)})
+            local sectionLabel = createInstance("TextLabel", {
+                Name = "SectionLabel",
+                Parent = section._sectionFrame,
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1,0,0.2,0),
+                Font = Enum.Font.FredokaOne,
+                Text = sectionName,
+                TextColor3 = theme.Header,
+                TextScaled = true
+            })
+            -- API for section
+            function section:NewLabel(text)
+                local label = createInstance("TextLabel", {
+                    Parent = section._sectionFrame,
+                    BackgroundTransparency = 1,
+                    Position = UDim2.new(0.05,0,0.25 + #section._elements*0.15,0),
+                    Size = UDim2.new(0.9,0,0.12,0),
+                    Font = Enum.Font.FredokaOne,
+                    Text = text,
+                    TextColor3 = theme.TextColor,
+                    TextScaled = true
+                })
+                table.insert(section._elements, label)
+                return {
+                    UpdateLabel = function(_, newText)
+                        label.Text = newText
+                    end
+                }
+            end
+            function section:NewButton(text, info, callback)
+                local button = createInstance("TextButton", {
+                    Parent = section._sectionFrame,
+                    BackgroundColor3 = theme.Header,
+                    Position = UDim2.new(0.05,0,0.25 + #section._elements*0.15,0),
+                    Size = UDim2.new(0.9,0,0.12,0),
+                    Font = Enum.Font.FredokaOne,
+                    Text = text,
+                    TextColor3 = theme.TextColor,
+                    TextScaled = true
+                })
+                button.MouseButton1Click:Connect(function()
+                    if callback then callback() end
+                end)
+                table.insert(section._elements, button)
+                return {
+                    UpdateButton = function(_, newText)
+                        button.Text = newText
+                    end
+                }
+            end
+            function section:NewToggle(text, info, callback)
+                local state = false
+                local toggle = createInstance("TextButton", {
+                    Parent = section._sectionFrame,
+                    BackgroundColor3 = theme.Header,
+                    Position = UDim2.new(0.05,0,0.25 + #section._elements*0.15,0),
+                    Size = UDim2.new(0.9,0,0.12,0),
+                    Font = Enum.Font.FredokaOne,
+                    Text = text .. ": Off",
+                    TextColor3 = theme.TextColor,
+                    TextScaled = true
+                })
+                toggle.MouseButton1Click:Connect(function()
+                    state = not state
+                    toggle.Text = text .. ": " .. (state and "On" or "Off")
+                    if callback then callback(state) end
+                end)
+                table.insert(section._elements, toggle)
+                return {
+                    UpdateToggle = function(_, newText)
+                        toggle.Text = newText
+                    end
+                }
+            end
+            function section:NewSlider(text, info, max, min, callback)
+                local sliderLabel = createInstance("TextLabel", {
+                    Parent = section._sectionFrame,
+                    BackgroundTransparency = 1,
+                    Position = UDim2.new(0.05,0,0.25 + #section._elements*0.15,0),
+                    Size = UDim2.new(0.6,0,0.12,0),
+                    Font = Enum.Font.FredokaOne,
+                    Text = text .. ": " .. tostring(min),
+                    TextColor3 = theme.TextColor,
+                    TextScaled = true
+                })
+                local slider = createInstance("TextButton", {
+                    Parent = section._sectionFrame,
+                    BackgroundColor3 = theme.Header,
+                    Position = UDim2.new(0.7,0,0.25 + #section._elements*0.15,0),
+                    Size = UDim2.new(0.25,0,0.12,0),
+                    Text = "",
+                })
+                local value = min
+                slider.MouseButton1Click:Connect(function()
+                    value = value + 1
+                    if value > max then value = min end
+                    sliderLabel.Text = text .. ": " .. tostring(value)
+                    if callback then callback(value) end
+                end)
+                table.insert(section._elements, sliderLabel)
+                table.insert(section._elements, slider)
+                return {
+                    UpdateSlider = function(_, newValue)
+                        value = newValue
+                        sliderLabel.Text = text .. ": " .. tostring(value)
+                    end
+                }
+            end
+            function section:NewDropdown(text, info, list, callback)
+                local dropdown = createInstance("TextButton", {
+                    Parent = section._sectionFrame,
+                    BackgroundColor3 = theme.Header,
+                    Position = UDim2.new(0.05,0,0.25 + #section._elements*0.15,0),
+                    Size = UDim2.new(0.9,0,0.12,0),
+                    Font = Enum.Font.FredokaOne,
+                    Text = text .. ": " .. tostring(list[1]),
+                    TextColor3 = theme.TextColor,
+                    TextScaled = true
+                })
+                local current = list[1]
+                dropdown.MouseButton1Click:Connect(function()
+                    local idx = table.find(list, current) or 1
+                    idx = idx + 1
+                    if idx > #list then idx = 1 end
+                    current = list[idx]
+                    dropdown.Text = text .. ": " .. tostring(current)
+                    if callback then callback(current) end
+                end)
+                table.insert(section._elements, dropdown)
+                return {
+                    Refresh = function(_, newList)
+                        list = newList
+                        current = list[1]
+                        dropdown.Text = text .. ": " .. tostring(current)
+                    end
+                }
+            end
+            function section:NewTextBox(text, info, callback)
+                local textbox = createInstance("TextBox", {
+                    Parent = section._sectionFrame,
+                    BackgroundColor3 = theme.ElementColor,
+                    Position = UDim2.new(0.05,0,0.25 + #section._elements*0.15,0),
+                    Size = UDim2.new(0.9,0,0.12,0),
+                    Font = Enum.Font.FredokaOne,
+                    Text = "",
+                    PlaceholderText = text,
+                    TextColor3 = theme.TextColor,
+                    TextScaled = true
+                })
+                textbox.FocusLost:Connect(function(enter)
+                    if enter and callback then callback(textbox.Text) end
+                end)
+                table.insert(section._elements, textbox)
+                return textbox
+            end
+            function section:NewKeybind(text, info, key, callback)
+                local keybind = createInstance("TextButton", {
+                    Parent = section._sectionFrame,
+                    BackgroundColor3 = theme.Header,
+                    Position = UDim2.new(0.05,0,0.25 + #section._elements*0.15,0),
+                    Size = UDim2.new(0.9,0,0.12,0),
+                    Font = Enum.Font.FredokaOne,
+                    Text = text .. ": " .. tostring(key.Name),
+                    TextColor3 = theme.TextColor,
+                    TextScaled = true
+                })
+                local UserInputService = game:GetService("UserInputService")
+                UserInputService.InputBegan:Connect(function(input, gpe)
+                    if not gpe and input.KeyCode == key then
+                        if callback then callback() end
+                    end
+                end)
+                table.insert(section._elements, keybind)
+                return keybind
+            end
+            function section:NewColorPicker(text, info, defaultColor, callback)
+                local colorBtn = createInstance("TextButton", {
+                    Parent = section._sectionFrame,
+                    BackgroundColor3 = defaultColor,
+                    Position = UDim2.new(0.05,0,0.25 + #section._elements*0.15,0),
+                    Size = UDim2.new(0.9,0,0.12,0),
+                    Font = Enum.Font.FredokaOne,
+                    Text = text,
+                    TextColor3 = theme.TextColor,
+                    TextScaled = true
+                })
+                colorBtn.MouseButton1Click:Connect(function()
+                    -- For demo: just cycle through some colors
+                    local colors = {Color3.fromRGB(255,0,0), Color3.fromRGB(0,255,0), Color3.fromRGB(0,0,255)}
+                    local idx = table.find(colors, colorBtn.BackgroundColor3) or 1
+                    idx = idx + 1
+                    if idx > #colors then idx = 1 end
+                    colorBtn.BackgroundColor3 = colors[idx]
+                    if callback then callback(colors[idx]) end
+                end)
+                table.insert(section._elements, colorBtn)
+                return colorBtn
+            end
+            table.insert(tab._sections, section)
+            return section
+        end
+        table.insert(window._tabs, tab)
+        return tab
+    end
+    return window
+end
+
+-- Theme API
+function UILibrary.AddTheme(name, themeTable)
+    themes[name] = themeTable
+end
+
+function UILibrary.GetThemes()
+    return themes
+end
+
+return UILibrary
