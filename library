@@ -1,6 +1,6 @@
 -- EclipseUILibrary.lua
 -- Modular, reusable UI library matching your Eclipse GUI reference
--- Supports: Buttons, Toggles, Sliders, Dropdowns, Textboxes, Keybinds, Labels, Sections
+-- Supports: Sidebar, Tabs, Cards, Buttons, Toggles, Sliders, Dropdowns, Textboxes, Keybinds, Labels
 
 local EclipseUILibrary = {}
 EclipseUILibrary.__index = EclipseUILibrary
@@ -13,14 +13,176 @@ local function create(class, props)
     return inst
 end
 
-local function getNextY(section)
-    local y = 0.12
-    for _, child in ipairs(section:GetChildren()) do
-        if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("TextBox") or child:IsA("TextLabel") then
-            y = y + child.Size.Y.Scale + 0.02
-        end
+local sidebarButtons = {
+    {Name = "Aimbot", Icon = "rbxassetid://114890619448076"},
+    {Name = "Reach", Icon = "rbxassetid://110655544111595"},
+    {Name = "Movement", Icon = "rbxassetid://89157912594378"},
+    {Name = "Automation", Icon = "rbxassetid://125270223171482"},
+    {Name = "OOB", Icon = "rbxassetid://80444649346887"},
+    {Name = "Anti-System", Icon = "rbxassetid://114890619448076"},
+    {Name = "Community", Icon = "rbxassetid://101752413421565"},
+    {Name = "Settings", Icon = "rbxassetid://85911450793750"},
+}
+
+local function makeCard(parent, cardTitle)
+    local card = create("Frame", {
+        Parent = parent,
+        BackgroundColor3 = Color3.fromRGB(17, 17, 17),
+        Size = UDim2.new(0.95, 0, 0.35, 0),
+        Position = UDim2.new(0.025, 0, 0.05, 0)
+    })
+    create("UICorner", {Parent = card, CornerRadius = UDim.new(0, 14)})
+    create("TextLabel", {
+        Parent = card,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0.18, 0),
+        Font = Enum.Font.FredokaOne,
+        Text = cardTitle,
+        TextColor3 = Color3.fromRGB(132, 132, 132),
+        TextScaled = true
+    })
+    local y = 0.20
+    local function addElement(element)
+        element.Position = UDim2.new(0.05, 0, y, 0)
+        y = y + element.Size.Y.Scale + 0.02
     end
-    return y
+    return {
+        AddLabel = function(text)
+            local label = create("TextLabel", {
+                Parent = card,
+                BackgroundTransparency = 1,
+                Size = UDim2.new(0.9, 0, 0.10, 0),
+                Font = Enum.Font.FredokaOne,
+                Text = text,
+                TextColor3 = Color3.fromRGB(132, 132, 132),
+                TextScaled = true
+            })
+            addElement(label)
+            return label
+        end,
+        AddButton = function(text, callback)
+            local btn = create("TextButton", {
+                Parent = card,
+                BackgroundColor3 = Color3.fromRGB(255, 80, 80),
+                Size = UDim2.new(0.9, 0, 0.10, 0),
+                Font = Enum.Font.FredokaOne,
+                Text = text,
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                TextScaled = true
+            })
+            btn.MouseButton1Click:Connect(function()
+                if callback then callback() end
+            end)
+            addElement(btn)
+            return btn
+        end,
+        AddToggle = function(text, callback)
+            local state = false
+            local toggle = create("TextButton", {
+                Parent = card,
+                BackgroundColor3 = Color3.fromRGB(255, 80, 80),
+                Size = UDim2.new(0.9, 0, 0.10, 0),
+                Font = Enum.Font.FredokaOne,
+                Text = text .. ": Off",
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                TextScaled = true
+            })
+            toggle.MouseButton1Click:Connect(function()
+                state = not state
+                toggle.Text = text .. ": " .. (state and "On" or "Off")
+                if callback then callback(state) end
+            end)
+            addElement(toggle)
+            return toggle
+        end,
+        AddSlider = function(text, min, max, callback)
+            local sliderLabel = create("TextLabel", {
+                Parent = card,
+                BackgroundTransparency = 1,
+                Size = UDim2.new(0.6, 0, 0.10, 0),
+                Font = Enum.Font.FredokaOne,
+                Text = text .. ": " .. tostring(min),
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                TextScaled = true
+            })
+            local slider = create("TextButton", {
+                Parent = card,
+                BackgroundColor3 = Color3.fromRGB(255, 80, 80),
+                Position = UDim2.new(0.7, 0, y, 0),
+                Size = UDim2.new(0.25, 0, 0.10, 0),
+                Text = "",
+            })
+            local value = min
+            slider.MouseButton1Click:Connect(function()
+                value = value + 1
+                if value > max then value = min end
+                sliderLabel.Text = text .. ": " .. tostring(value)
+                if callback then callback(value) end
+            end)
+            addElement(sliderLabel)
+            addElement(slider)
+            return slider
+        end,
+        AddDropdown = function(text, list, callback)
+            local dropdown = create("TextButton", {
+                Parent = card,
+                BackgroundColor3 = Color3.fromRGB(53, 53, 53),
+                Size = UDim2.new(0.9, 0, 0.10, 0),
+                Font = Enum.Font.FredokaOne,
+                Text = text .. ": " .. tostring(list[1]),
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                TextScaled = true,
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+            local current = list[1]
+            dropdown.MouseButton1Click:Connect(function()
+                local idx = table.find(list, current) or 1
+                idx = idx + 1
+                if idx > #list then idx = 1 end
+                current = list[idx]
+                dropdown.Text = text .. ": " .. tostring(current)
+                if callback then callback(current) end
+            end)
+            addElement(dropdown)
+            return dropdown
+        end,
+        AddTextbox = function(placeholder, callback)
+            local textbox = create("TextBox", {
+                Parent = card,
+                BackgroundColor3 = Color3.fromRGB(29, 29, 29),
+                Size = UDim2.new(0.9, 0, 0.10, 0),
+                Font = Enum.Font.FredokaOne,
+                Text = "",
+                PlaceholderText = placeholder,
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                TextScaled = true
+            })
+            textbox.FocusLost:Connect(function(enter)
+                if enter and callback then callback(textbox.Text) end
+            end)
+            addElement(textbox)
+            return textbox
+        end,
+        AddKeybind = function(text, key, callback)
+            local keybind = create("TextButton", {
+                Parent = card,
+                BackgroundColor3 = Color3.fromRGB(255, 80, 80),
+                Size = UDim2.new(0.9, 0, 0.10, 0),
+                Font = Enum.Font.FredokaOne,
+                Text = text .. ": " .. tostring(key.Name),
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                TextScaled = true
+            })
+            local UserInputService = game:GetService("UserInputService")
+            UserInputService.InputBegan:Connect(function(input, gpe)
+                if not gpe and input.KeyCode == key then
+                    if callback then callback() end
+                end
+            end)
+            addElement(keybind)
+            return keybind
+        end
+    }
 end
 
 function EclipseUILibrary.CreateWindow(title)
@@ -39,8 +201,8 @@ function EclipseUILibrary.CreateWindow(title)
         Parent = gui,
         BackgroundColor3 = Color3.fromRGB(7, 7, 7),
         BorderSizePixel = 0,
-        Position = UDim2.new(0.26598835, 0, 0.275419861, 0),
-        Size = UDim2.new(0.634831786, 0, 0.482990801, 0)
+        Position = UDim2.new(0.1, 0, 0.1, 0),
+        Size = UDim2.new(0.8, 0, 0.8, 0)
     })
     create("UICorner", {Parent = mainFrame, CornerRadius = UDim.new(0, 14)})
 
@@ -49,206 +211,92 @@ function EclipseUILibrary.CreateWindow(title)
         Name = "TextLabel-Header",
         Parent = mainFrame,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0.0559853315, 0, 0.0302262437, 0),
-        Size = UDim2.new(0.250128567, 0, 0.0431636423, 0),
+        Position = UDim2.new(0.02, 0, 0.01, 0),
+        Size = UDim2.new(0.3, 0, 0.06, 0),
         Font = Enum.Font.FredokaOne,
         Text = title or "Eclipse Hub | Version: 1.35",
         TextColor3 = Color3.fromRGB(255, 80, 80),
         TextScaled = true,
-        TextSize = 14,
         TextWrapped = true
     })
 
-    -- Left Section
-    local left = create("Frame", {
-        Name = "GeneralFrameleft1",
+    -- Sidebar
+    local sidebar = create("Frame", {
+        Name = "Sidebar",
         Parent = mainFrame,
-        BackgroundColor3 = Color3.fromRGB(17, 17, 17),
-        BorderSizePixel = 0,
-        Position = UDim2.new(0.209897831, 0, 0.118767127, 0),
-        Size = UDim2.new(0.371992737, 0, 0.508837581, 0)
+        BackgroundColor3 = Color3.fromRGB(10, 10, 10),
+        Size = UDim2.new(0.18, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0)
     })
-    create("UICorner", {Parent = left, CornerRadius = UDim.new(0, 14)})
+    create("UICorner", {Parent = sidebar, CornerRadius = UDim.new(0, 14)})
 
-    -- Right Section
-    local right = create("Frame", {
-        Name = "GeneralFrameright2",
-        Parent = mainFrame,
-        BackgroundColor3 = Color3.fromRGB(17, 17, 17),
-        BorderSizePixel = 0,
-        Position = UDim2.new(0.613037109, 0, 0.118767127, 0),
-        Size = UDim2.new(0.371992737, 0, 0.508837581, 0)
-    })
-    create("UICorner", {Parent = right, CornerRadius = UDim.new(0, 14)})
+    -- Tab system
+    local tabs = {}
+    local currentTab = nil
 
-    -- Section API
-    local function makeSection(parent, sectionName)
-        local section = create("Frame", {
-            Name = sectionName .. "Section",
-            Parent = parent,
+    function self:AddTab(tabName)
+        local tab = {}
+        tab.Name = tabName
+        tab.Content = create("Frame", {
+            Parent = mainFrame,
             BackgroundTransparency = 1,
-            Size = UDim2.new(1, 0, 1, 0),
-            Position = UDim2.new(0, 0, 0, 0)
+            Size = UDim2.new(0.8, 0, 1, 0),
+            Position = UDim2.new(0.18, 0, 0, 0),
+            Visible = false
         })
-        local y = 0.02
-        local function addLabel(text)
-            local label = create("TextLabel", {
-                Parent = section,
-                BackgroundTransparency = 1,
-                Position = UDim2.new(0.05, 0, y, 0),
-                Size = UDim2.new(0.9, 0, 0.08, 0),
-                Font = Enum.Font.FredokaOne,
-                Text = text,
-                TextColor3 = Color3.fromRGB(132, 132, 132),
-                TextScaled = true,
-                TextSize = 14,
-                TextWrapped = true
-            })
-            y = y + 0.1
-            return label
+
+        -- Sidebar button
+        local btn = create("TextButton", {
+            Parent = sidebar,
+            BackgroundColor3 = Color3.fromRGB(17, 17, 17),
+            Size = UDim2.new(0.9, 0, 0.08, 0),
+            Position = UDim2.new(0.05, 0, 0.05 + (#tabs)*0.1, 0),
+            Font = Enum.Font.FredokaOne,
+            Text = "  " .. tabName,
+            TextColor3 = Color3.fromRGB(255, 80, 80),
+            TextScaled = true,
+            TextXAlignment = Enum.TextXAlignment.Left
+        })
+        create("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 14)})
+
+        -- Icon (optional)
+        for _, info in ipairs(sidebarButtons) do
+            if info.Name == tabName then
+                create("ImageLabel", {
+                    Parent = btn,
+                    BackgroundTransparency = 1,
+                    Size = UDim2.new(0.15, 0, 0.7, 0),
+                    Position = UDim2.new(0.01, 0, 0.15, 0),
+                    Image = info.Icon
+                })
+            end
         end
-        local function addButton(text, callback)
-            local btn = create("TextButton", {
-                Parent = section,
-                BackgroundColor3 = Color3.fromRGB(255, 80, 80),
-                Position = UDim2.new(0.05, 0, y, 0),
-                Size = UDim2.new(0.9, 0, 0.08, 0),
-                Font = Enum.Font.FredokaOne,
-                Text = text,
-                TextColor3 = Color3.fromRGB(255, 255, 255),
-                TextScaled = true
-            })
-            btn.MouseButton1Click:Connect(function()
-                if callback then callback() end
-            end)
-            y = y + 0.1
-            return btn
+
+        btn.MouseButton1Click:Connect(function()
+            if currentTab then currentTab.Content.Visible = false end
+            tab.Content.Visible = true
+            currentTab = tab
+        end)
+
+        table.insert(tabs, tab)
+        if #tabs == 1 then
+            tab.Content.Visible = true
+            currentTab = tab
         end
-        local function addToggle(text, callback)
-            local state = false
-            local toggle = create("TextButton", {
-                Parent = section,
-                BackgroundColor3 = Color3.fromRGB(255, 80, 80),
-                Position = UDim2.new(0.05, 0, y, 0),
-                Size = UDim2.new(0.9, 0, 0.08, 0),
-                Font = Enum.Font.FredokaOne,
-                Text = text .. ": Off",
-                TextColor3 = Color3.fromRGB(255, 255, 255),
-                TextScaled = true
-            })
-            toggle.MouseButton1Click:Connect(function()
-                state = not state
-                toggle.Text = text .. ": " .. (state and "On" or "Off")
-                if callback then callback(state) end
-            end)
-            y = y + 0.1
-            return toggle
+
+        -- Card section API
+        function tab:AddCard(cardTitle)
+            return makeCard(tab.Content, cardTitle)
         end
-        local function addSlider(text, min, max, callback)
-            local sliderLabel = create("TextLabel", {
-                Parent = section,
-                BackgroundTransparency = 1,
-                Position = UDim2.new(0.05, 0, y, 0),
-                Size = UDim2.new(0.6, 0, 0.08, 0),
-                Font = Enum.Font.FredokaOne,
-                Text = text .. ": " .. tostring(min),
-                TextColor3 = Color3.fromRGB(255, 255, 255),
-                TextScaled = true
-            })
-            local slider = create("TextButton", {
-                Parent = section,
-                BackgroundColor3 = Color3.fromRGB(255, 80, 80),
-                Position = UDim2.new(0.7, 0, y, 0),
-                Size = UDim2.new(0.25, 0, 0.08, 0),
-                Text = "",
-            })
-            local value = min
-            slider.MouseButton1Click:Connect(function()
-                value = value + 1
-                if value > max then value = min end
-                sliderLabel.Text = text .. ": " .. tostring(value)
-                if callback then callback(value) end
-            end)
-            y = y + 0.1
-            return slider
-        end
-        local function addDropdown(text, list, callback)
-            local dropdown = create("TextButton", {
-                Parent = section,
-                BackgroundColor3 = Color3.fromRGB(53, 53, 53),
-                Position = UDim2.new(0.05, 0, y, 0),
-                Size = UDim2.new(0.9, 0, 0.08, 0),
-                Font = Enum.Font.FredokaOne,
-                Text = text .. ": " .. tostring(list[1]),
-                TextColor3 = Color3.fromRGB(255, 255, 255),
-                TextScaled = true,
-                TextXAlignment = Enum.TextXAlignment.Left
-            })
-            local current = list[1]
-            dropdown.MouseButton1Click:Connect(function()
-                local idx = table.find(list, current) or 1
-                idx = idx + 1
-                if idx > #list then idx = 1 end
-                current = list[idx]
-                dropdown.Text = text .. ": " .. tostring(current)
-                if callback then callback(current) end
-            end)
-            y = y + 0.1
-            return dropdown
-        end
-        local function addTextbox(placeholder, callback)
-            local textbox = create("TextBox", {
-                Parent = section,
-                BackgroundColor3 = Color3.fromRGB(29, 29, 29),
-                Position = UDim2.new(0.05, 0, y, 0),
-                Size = UDim2.new(0.9, 0, 0.08, 0),
-                Font = Enum.Font.FredokaOne,
-                Text = "",
-                PlaceholderText = placeholder,
-                TextColor3 = Color3.fromRGB(255, 255, 255),
-                TextScaled = true
-            })
-            textbox.FocusLost:Connect(function(enter)
-                if enter and callback then callback(textbox.Text) end
-            end)
-            y = y + 0.1
-            return textbox
-        end
-        local function addKeybind(text, key, callback)
-            local keybind = create("TextButton", {
-                Parent = section,
-                BackgroundColor3 = Color3.fromRGB(255, 80, 80),
-                Position = UDim2.new(0.05, 0, y, 0),
-                Size = UDim2.new(0.9, 0, 0.08, 0),
-                Font = Enum.Font.FredokaOne,
-                Text = text .. ": " .. tostring(key.Name),
-                TextColor3 = Color3.fromRGB(255, 255, 255),
-                TextScaled = true
-            })
-            local UserInputService = game:GetService("UserInputService")
-            UserInputService.InputBegan:Connect(function(input, gpe)
-                if not gpe and input.KeyCode == key then
-                    if callback then callback() end
-                end
-            end)
-            y = y + 0.1
-            return keybind
-        end
-        return {
-            AddLabel = addLabel,
-            AddButton = addButton,
-            AddToggle = addToggle,
-            AddSlider = addSlider,
-            AddDropdown = addDropdown,
-            AddTextbox = addTextbox,
-            AddKeybind = addKeybind
-        }
+
+        return tab
     end
 
-    self.LeftSection = makeSection(left, "Left")
-    self.RightSection = makeSection(right, "Right")
+    self.AddTab = self.AddTab
     self.Gui = gui
     self.MainFrame = mainFrame
+    self.Sidebar = sidebar
+    self.Tabs = tabs
     return self
 end
 
